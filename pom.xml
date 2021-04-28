@@ -10,17 +10,17 @@
     <url>http://maven.apache.org</url>
 
     <properties>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
     </properties>
     
     <distributionManagement>
-        <repository>
-            <id>archiva.internal</id>
-            <name>Internal Release Repository</name>
-            <url>http://archiva.progbits.com/repository/internal/</url>
-        </repository>
-    </distributionManagement>
+		<repository>
+			<id>internal.repo</id>
+			<name>Internal Repo</name>
+			<url>${mvnRepo}</url>
+		</repository>
+	</distributionManagement>
 
     <dependencies>
 
@@ -86,7 +86,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-pmd-plugin</artifactId>
-                <version>3.9.0</version>
+                <version>3.14.0</version>
                 <executions>
                     <execution>
                         <goals>
