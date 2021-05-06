@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -873,12 +875,211 @@ public class SsDbUtils {
 		return retObj;
 	}
 	
+	/**
+	 * Executes a SQL Statement and Returns a Valid ApiObject
+	 * 
+	 * <p><b>Example:</b> SELECT * FROM tableName WHERE firstName=:firstName</p>
+	 * @param conn Connection to run the SQL Against
+	 * @param sql The parameterized SQL
+	 * @param args Arguments to use in the SQL Statement
+	 * @return ApiObject with the column names as field Names in a list named "root"
+	 * 
+	 * @throws ApiException 
+	 */
+	public static ApiObject querySqlAsApiObject(Connection conn, String sql, ApiObject args) throws ApiException {
+		Matcher matcher = sqlPattern.matcher(sql);
+		
+		List<String> foundItems = new ArrayList<>();
+		
+		while (matcher.find()) {
+			foundItems.add(matcher.group(2));
+		}
+		
+		List<Object> params = new ArrayList<>();
+		String lclSql = sql;
+		
+		for (String found : foundItems) {
+			if (args.containsKey(found)) {
+				params.add(args.get(found));
+				lclSql = lclSql.replace(":" + found, "?");
+			} else {
+				throw new ApiException("Argument: " + found + " Doesn't Exist");
+			}
+		}
+		
+		return querySqlAsApiObject(conn, lclSql, params.toArray());
+	}
+	
 	public static Object convertObject(Object v) {
 		if (v instanceof Timestamp) {
 			Instant instant = Instant.ofEpochMilli(((Timestamp) v).getTime());
 			return OffsetDateTime.ofInstant(instant, ZoneId.of("UTC"));
 		} else {
 			return v;
+		}
+	}
+	
+	static Pattern sqlPattern = Pattern.compile("(:(.[^\\s,);]*))");
+	
+	/**
+	 * Uses an ApiObject to pass the parameter names to the SQL statement.
+	 * 
+	 * Use :name to set the arguments that should be replaced.  
+	 * 
+	 * <p><b>Example:</b> SELECT * FROM tableName WHERE firstName=:firstName</p>
+	 * @param conn The connection to use to make the call to SQL
+	 * @param sql The parameterized SQL
+	 * @param args ApiObject with the fields to send to the SQL.
+	 * @return true/false if the call worked
+	 * @throws ApiException Argument exception if the argument doesn't exist in args, SQL exception
+	 */
+	public static Boolean updateObject(Connection conn, String sql, ApiObject args) throws ApiException {
+		Matcher matcher = sqlPattern.matcher(sql);
+		
+		List<String> foundItems = new ArrayList<>();
+		
+		while (matcher.find()) {
+			foundItems.add(matcher.group(2));
+		}
+		
+		List<Object> params = new ArrayList<>();
+		String lclSql = sql;
+		
+		for (String found : foundItems) {
+			if (args.containsKey(found)) {
+				params.add(args.get(found));
+				lclSql = lclSql.replace(":" + found, "?");
+			} else {
+				throw new ApiException("Argument: " + found + " Doesn't Exist");
+			}
+		}
+		
+		try {
+			return update(conn, lclSql, params.toArray());
+		} catch (Exception ex) {
+			throw new ApiException("SQL: " + ex.getMessage());
+		}
+	}
+	
+	/**
+	 * Uses an ApiObject to pass the parameter names to the SQL statement.
+	 * 
+	 * Use :name to set the arguments that should be replaced.  
+	 * 
+	 * <p><b>Example:</b> SELECT * FROM tableName WHERE firstName=:firstName</p>
+	 * @param conn The connection to use to make the call to SQL
+	 * @param sql The parameterized SQL
+	 * @param args ApiObject with the fields to send to the SQL.
+	 * @return Integer with the number of records that were modified
+	 * @throws ApiException Argument exception if the argument doesn't exist in args, SQL exception
+	 */
+	public static Integer updateObjectWithCount(Connection conn, String sql, ApiObject args) throws ApiException {
+		Matcher matcher = sqlPattern.matcher(sql);
+		
+		List<String> foundItems = new ArrayList<>();
+		
+		while (matcher.find()) {
+			foundItems.add(matcher.group(2));
+		}
+		
+		List<Object> params = new ArrayList<>();
+		String lclSql = sql;
+		
+		for (String found : foundItems) {
+			if (args.containsKey(found)) {
+				params.add(args.get(found));
+				lclSql = lclSql.replace(":" + found, "?");
+			} else {
+				throw new ApiException("Argument: " + found + " Doesn't Exist");
+			}
+		}
+		
+		try {
+			return updateWithCount(conn, lclSql, params.toArray());
+		} catch (Exception ex) {
+			throw new ApiException("SQL: " + ex.getMessage());
+		}
+	}
+	
+	/**
+	 * Uses an ApiObject to pass the parameter names to the SQL statement.
+	 * 
+	 * Use :name to set the arguments that should be replaced.  
+	 * 
+	 * <p><b>Example:</b> SELECT * FROM tableName WHERE firstName=:firstName</p>
+	 * @param conn The connection to use to make the call to SQL
+	 * @param sql The parameterized SQL
+	 * @param keys The names of the keys to capture the new ID from
+	 * @param args ApiObject with the fields to send to the SQL.
+	 * @return Integer value of the inserted Key field
+	 * @throws ApiException Argument exception if the argument doesn't exist in args, SQL exception
+	 */
+	public static Integer insertObjectWithKey(Connection conn, String sql, String[] keys, ApiObject args) throws ApiException {
+		Matcher matcher = sqlPattern.matcher(sql);
+		
+		List<String> foundItems = new ArrayList<>();
+		
+		while (matcher.find()) {
+			foundItems.add(matcher.group(2));
+		}
+		
+		List<Object> params = new ArrayList<>();
+		String lclSql = sql;
+		
+		for (String found : foundItems) {
+			if (args.containsKey(found)) {
+				params.add(args.get(found));
+				lclSql = lclSql.replace(":" + found, "?");
+			} else {
+				throw new ApiException("Argument: " + found + " Doesn't Exist in Arg Object");
+			}
+		}
+		
+		try {
+			return insertWithKey(conn, lclSql, params.toArray(), keys);
+		} catch (Exception ex) {
+			throw new ApiException("SQL: " + ex.getMessage());
+		}
+	}
+	
+	/**
+	 * Uses an ApiObject to pass the parameter names to the SQL statement.
+	 * 
+	 * Use :name to set the arguments that should be replaced.  
+	 * 
+	 * <p><b>Example:</b> SELECT id FROM tableName WHERE firstName=:firstName</p>
+	 * @param conn The connection to use to make the call to SQL
+	 * @param sql The parameterized SQL
+	 * @param keys The names of the keys to capture the new ID from
+	 * @param args ApiObject with the fields to send to the SQL.
+	 * @return The first row, the first column as an Integer
+	 * @throws ApiException Argument exception if the argument doesn't exist in args, SQL exception
+	 */
+	public static Integer queryObjectForInt(Connection conn, String sql, String[] keys, ApiObject args) throws ApiException {
+		Matcher matcher = sqlPattern.matcher(sql);
+		
+		List<String> foundItems = new ArrayList<>();
+		
+		while (matcher.find()) {
+			foundItems.add(matcher.group(2));
+		}
+		
+		List<Object> params = new ArrayList<>();
+		String lclSql = sql;
+		
+		for (String found : foundItems) {
+			if (args.containsKey(found)) {
+				params.add(args.get(found));
+				lclSql = lclSql.replace(":" + found, "?");
+			} else {
+				throw new ApiException("Argument: " + found + " Doesn't Exist in Arg Object");
+			}
+		}
+		
+		try {
+			return queryForInt(conn, lclSql, params.toArray());
+		} catch (Exception ex) {
+			throw new ApiException("SQL: " + ex.getMessage());
 		}
 	}
 }
