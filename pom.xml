@@ -5,7 +5,7 @@
     <groupId>com.progbits.db</groupId>
     <artifactId>SsDbUtils</artifactId>
     <packaging>bundle</packaging>
-    <version>2.3.4</version>
+    <version>2.3.5</version>
     <name>Simple JDBC Layer</name>
     <url>http://maven.apache.org</url>
 
@@ -14,13 +14,20 @@
         <maven.compiler.target>11</maven.compiler.target>
     </properties>
     
+    <repositories>
+        <repository>
+            <id>ProgbitsRepo</id>
+            <url>https://archiva.progbits.com/repository/internal/</url>
+        </repository>
+    </repositories>
+
     <distributionManagement>
-		<repository>
-			<id>internal.repo</id>
-			<name>Internal Repo</name>
-			<url>${mvnRepo}</url>
-		</repository>
-	</distributionManagement>
+        <repository>
+            <id>internal.repo</id>
+            <name>Internal Repo</name>
+            <url>${mvnRepo}</url>
+        </repository>
+    </distributionManagement>
 
     <dependencies>
 
@@ -83,34 +90,34 @@
                     </execution>
                 </executions>
             </plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-source-plugin</artifactId>
-				<version>3.2.1</version>
-				<executions>
-					<execution>
-						<id>attach-sources</id>
-						<goals>
-							<goal>jar</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-			<!--
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-pmd-plugin</artifactId>
-                <version>3.14.0</version>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.2.1</version>
                 <executions>
                     <execution>
+                        <id>attach-sources</id>
                         <goals>
-                            <goal>check</goal>
-                            <goal>cpd-check</goal>
+                            <goal>jar</goal>
                         </goals>
                     </execution>
                 </executions>
             </plugin>
-			-->
+            <!--
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-pmd-plugin</artifactId>
+    <version>3.14.0</version>
+    <executions>
+        <execution>
+            <goals>
+                <goal>check</goal>
+                <goal>cpd-check</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
+            -->
         </plugins>
     </build>
 </project>
