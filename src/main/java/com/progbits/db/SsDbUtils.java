@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.sql.rowset.serial.SerialArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -879,6 +878,70 @@ public class SsDbUtils {
         return retObj;
     }
 
+    private static String gatherParamsForSql(String sql, List<Object> params, ApiObject args) throws ApiException {
+        Matcher matcher = sqlPattern.matcher(sql);
+
+        List<String> foundItems = new ArrayList<>();
+
+        while (matcher.find()) {
+            foundItems.add(matcher.group(2));
+        }
+
+        String lclSql = sql;
+
+        for (String found : foundItems) {
+            if (args.containsKey(found)) {
+                switch (args.getType(found)) {
+                    case ApiObject.TYPE_STRINGARRAY:
+                        StringBuilder replaceVal = new StringBuilder();
+
+                        AtomicBoolean blnFirst = new AtomicBoolean(true);
+
+                        args.getStringArray(found).forEach((val) -> {
+                            params.add(val);
+                            if (!blnFirst.get()) {
+                                replaceVal.append(",");
+                            } else {
+                                blnFirst.set(false);
+                            }
+
+                            replaceVal.append("?");
+                        });
+
+                        lclSql = lclSql.replace(":" + found, replaceVal.toString());
+                        break;
+
+                    case ApiObject.TYPE_INTEGERARRAY:
+                        StringBuilder replaceVal2 = new StringBuilder();
+
+                        AtomicBoolean blnFirst2 = new AtomicBoolean(true);
+
+                        args.getIntegerArray(found).forEach((val) -> {
+                            params.add(val);
+                            if (!blnFirst2.get()) {
+                                replaceVal2.append(",");
+                            } else {
+                                blnFirst2.set(false);
+                            }
+
+                            replaceVal2.append("?");
+                        });
+
+                        lclSql = lclSql.replace(":" + found, replaceVal2.toString());
+                        break;
+
+                    default:
+                        params.add(args.get(found));
+                        lclSql = lclSql.replace(":" + found, "?");
+                }
+            } else {
+                throw new ApiException("Argument: " + found + " Doesn't Exist");
+            }
+        }
+
+        return lclSql;
+    }
+
     /**
      * Executes a SQL Statement and Returns a Valid ApiObject
      *
@@ -894,48 +957,9 @@ public class SsDbUtils {
      * @throws ApiException
      */
     public static ApiObject querySqlAsApiObject(Connection conn, String sql, ApiObject args) throws ApiException {
-        Matcher matcher = sqlPattern.matcher(sql);
-
-        List<String> foundItems = new ArrayList<>();
-
-        while (matcher.find()) {
-            foundItems.add(matcher.group(2));
-        }
-
         List<Object> params = new ArrayList<>();
-        String lclSql = sql;
 
-        for (String found : foundItems) {
-            if (args.containsKey(found)) {
-                switch (args.getType(found)) {
-                    case ApiObject.TYPE_STRINGARRAY:
-                    case ApiObject.TYPE_INTEGERARRAY:
-                        StringBuilder replaceVal = new StringBuilder();
-
-                        AtomicBoolean blnFirst = new AtomicBoolean(true);
-                        
-                        args.getStringArray(found).forEach((val) -> {
-                            params.add(val);
-                            if (!blnFirst.get()) {
-                                replaceVal.append(",");
-                            } else {
-                                blnFirst.set(false);
-                            }
-                            
-                            replaceVal.append("?");
-                        });
-                        
-                        lclSql = lclSql.replace(":" + found, replaceVal.toString());
-                        break;
-
-                    default:
-                        params.add(args.get(found));
-                        lclSql = lclSql.replace(":" + found, "?");
-                }
-            } else {
-                throw new ApiException("Argument: " + found + " Doesn't Exist");
-            }
-        }
+        String lclSql = gatherParamsForSql(sql, params, args);
 
         return querySqlAsApiObject(conn, lclSql, params.toArray());
     }
@@ -967,25 +991,9 @@ public class SsDbUtils {
      * args, SQL exception
      */
     public static Boolean updateObject(Connection conn, String sql, ApiObject args) throws ApiException {
-        Matcher matcher = sqlPattern.matcher(sql);
-
-        List<String> foundItems = new ArrayList<>();
-
-        while (matcher.find()) {
-            foundItems.add(matcher.group(2));
-        }
-
         List<Object> params = new ArrayList<>();
-        String lclSql = sql;
 
-        for (String found : foundItems) {
-            if (args.containsKey(found)) {
-                params.add(args.get(found));
-                lclSql = lclSql.replace(":" + found, "?");
-            } else {
-                throw new ApiException("Argument: " + found + " Doesn't Exist");
-            }
-        }
+        String lclSql = gatherParamsForSql(sql, params, args);
 
         try {
             return update(conn, lclSql, params.toArray());
@@ -1010,25 +1018,9 @@ public class SsDbUtils {
      * args, SQL exception
      */
     public static Integer updateObjectWithCount(Connection conn, String sql, ApiObject args) throws ApiException {
-        Matcher matcher = sqlPattern.matcher(sql);
-
-        List<String> foundItems = new ArrayList<>();
-
-        while (matcher.find()) {
-            foundItems.add(matcher.group(2));
-        }
-
         List<Object> params = new ArrayList<>();
-        String lclSql = sql;
 
-        for (String found : foundItems) {
-            if (args.containsKey(found)) {
-                params.add(args.get(found));
-                lclSql = lclSql.replace(":" + found, "?");
-            } else {
-                throw new ApiException("Argument: " + found + " Doesn't Exist");
-            }
-        }
+        String lclSql = gatherParamsForSql(sql, params, args);
 
         try {
             return updateWithCount(conn, lclSql, params.toArray());
@@ -1054,25 +1046,9 @@ public class SsDbUtils {
      * args, SQL exception
      */
     public static Integer insertObjectWithKey(Connection conn, String sql, String[] keys, ApiObject args) throws ApiException {
-        Matcher matcher = sqlPattern.matcher(sql);
-
-        List<String> foundItems = new ArrayList<>();
-
-        while (matcher.find()) {
-            foundItems.add(matcher.group(2));
-        }
-
         List<Object> params = new ArrayList<>();
-        String lclSql = sql;
 
-        for (String found : foundItems) {
-            if (args.containsKey(found)) {
-                params.add(args.get(found));
-                lclSql = lclSql.replace(":" + found, "?");
-            } else {
-                throw new ApiException("Argument: " + found + " Doesn't Exist in Arg Object");
-            }
-        }
+        String lclSql = gatherParamsForSql(sql, params, args);
 
         try {
             return insertWithKey(conn, lclSql, params.toArray(), keys);
@@ -1098,25 +1074,9 @@ public class SsDbUtils {
      * args, SQL exception
      */
     public static Integer queryObjectForInt(Connection conn, String sql, String[] keys, ApiObject args) throws ApiException {
-        Matcher matcher = sqlPattern.matcher(sql);
-
-        List<String> foundItems = new ArrayList<>();
-
-        while (matcher.find()) {
-            foundItems.add(matcher.group(2));
-        }
-
         List<Object> params = new ArrayList<>();
-        String lclSql = sql;
 
-        for (String found : foundItems) {
-            if (args.containsKey(found)) {
-                params.add(args.get(found));
-                lclSql = lclSql.replace(":" + found, "?");
-            } else {
-                throw new ApiException("Argument: " + found + " Doesn't Exist in Arg Object");
-            }
-        }
+        String lclSql = gatherParamsForSql(sql, params, args);
 
         try {
             return queryForInt(conn, lclSql, params.toArray());
