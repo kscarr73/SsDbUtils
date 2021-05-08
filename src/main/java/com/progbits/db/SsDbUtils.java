@@ -35,9 +35,9 @@ public class SsDbUtils {
         String dbType = getDbType(conn);
 
         if (dbType.equals("Microsoft SQL Server")) {
-            ps = conn.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            ps = conn.prepareStatement(sql, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
         } else {
-            ps = conn.prepareStatement(sql);
+            ps = conn.prepareStatement(sql, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
         }
 
         if ("PostgreSQL".equals(dbType)) {
@@ -87,13 +87,13 @@ public class SsDbUtils {
     public static Tuple<PreparedStatement, ResultSet> returnResultset(
             Connection conn, String sql, Object[] args, int iStart, int iCount)
             throws Exception {
-        Tuple<PreparedStatement, ResultSet> ret = new Tuple<PreparedStatement, ResultSet>();
+        Tuple<PreparedStatement, ResultSet> ret = new Tuple<>();
 
         String dbType = conn.getMetaData().getDatabaseProductName();
 
         boolean bForceStart = dbType.equals("Microsoft SQL Server");
 
-        String strSQL = "";
+        String strSQL;
 
         if (iCount > 0) {
             if (bForceStart) {
@@ -830,15 +830,52 @@ public class SsDbUtils {
     }
 
     public static List<String> getFieldNames(ResultSet rs) throws Exception {
-        List<String> fieldNames = new ArrayList<String>();
+        List<String> fieldNames = new ArrayList<>();
 
         int iCnt = rs.getMetaData().getColumnCount();
 
         for (int x = 1; x <= iCnt; x++) {
-            fieldNames.add(rs.getMetaData().getColumnName(x));
+            fieldNames.add(rs.getMetaData().getColumnLabel(x));
         }
 
         return fieldNames;
+    }
+
+    private static void queryForAllRowsIntoApiObject(Connection conn, String sql, Object[] args, ApiObject subject) throws Exception {
+        Tuple<PreparedStatement, ResultSet> rs = null;
+
+        try {
+            long lStartTime = System.currentTimeMillis();
+            rs = returnResultset(conn, sql, args);
+            log.debug("SQL Query: {}", System.currentTimeMillis() - lStartTime);
+
+            lStartTime = System.currentTimeMillis();
+            List<ApiObject> root;
+
+            if (!subject.isSet("root")) {
+                subject.createList("root");
+            }
+
+            root = subject.getList("root");
+
+            int iColumnCount = rs.getSecond().getMetaData().getColumnCount();
+
+            while (rs.getSecond().next()) {
+                ApiObject row = new ApiObject();
+
+                for (int xrow = 1; xrow <= iColumnCount; xrow++) {
+                    String colName = rs.getSecond().getMetaData().getColumnLabel(xrow);
+
+                    row.put(colName, convertObject(rs.getSecond().getObject(xrow)));
+                }
+
+                root.add(row);
+            }
+
+            log.debug("SQL Pull Query: {}", System.currentTimeMillis() - lStartTime);
+        } finally {
+            closeTuple(rs);
+        }
     }
 
     /**
@@ -858,19 +895,9 @@ public class SsDbUtils {
         ApiObject retObj = new ApiObject();
 
         try {
-            List<Map<String, Object>> sqlRun = SsDbUtils.queryForAllRows(conn, sql, args);
-
             retObj.createList("root");
 
-            sqlRun.forEach(obj -> {
-                ApiObject row = new ApiObject();
-
-                obj.forEach((k, v) -> {
-                    row.put(k, convertObject(v));
-                });
-
-                retObj.getList("root").add(row);
-            });
+            SsDbUtils.queryForAllRowsIntoApiObject(conn, sql, args, retObj);
         } catch (Exception ex) {
             throw new ApiException(ex.getMessage());
         }
@@ -878,18 +905,16 @@ public class SsDbUtils {
         return retObj;
     }
 
-    private static String gatherParamsForSql(String sql, List<Object> params, ApiObject args) throws ApiException {
+    protected static String gatherParamsForSql(String sql, List<Object> params, ApiObject args) throws ApiException {
         Matcher matcher = sqlPattern.matcher(sql);
 
-        List<String> foundItems = new ArrayList<>();
-
-        while (matcher.find()) {
-            foundItems.add(matcher.group(2));
-        }
+        //List<String> foundItems = new ArrayList<>();
 
         String lclSql = sql;
-
-        for (String found : foundItems) {
+        
+        while (matcher.find()) {
+            String found = matcher.group(2);
+            
             if (args.containsKey(found)) {
                 switch (args.getType(found)) {
                     case ApiObject.TYPE_STRINGARRAY:
@@ -908,7 +933,8 @@ public class SsDbUtils {
                             replaceVal.append("?");
                         });
 
-                        lclSql = lclSql.replace(":" + found, replaceVal.toString());
+                        lclSql = lclSql.replace(":" + found, replaceVal);
+                        
                         break;
 
                     case ApiObject.TYPE_INTEGERARRAY:
@@ -927,7 +953,7 @@ public class SsDbUtils {
                             replaceVal2.append("?");
                         });
 
-                        lclSql = lclSql.replace(":" + found, replaceVal2.toString());
+                        lclSql = lclSql.replace(":" + found, replaceVal2);
                         break;
 
                     default:
@@ -938,7 +964,7 @@ public class SsDbUtils {
                 throw new ApiException("Argument: " + found + " Doesn't Exist");
             }
         }
-
+        
         return lclSql;
     }
 
@@ -964,16 +990,18 @@ public class SsDbUtils {
         return querySqlAsApiObject(conn, lclSql, params.toArray());
     }
 
-    public static Object convertObject(Object v) {
+    protected static Object convertObject(Object v) {
         if (v instanceof Timestamp) {
             Instant instant = Instant.ofEpochMilli(((Timestamp) v).getTime());
-            return OffsetDateTime.ofInstant(instant, ZoneId.of("UTC"));
+            return OffsetDateTime.ofInstant(instant, ZoneId.systemDefault());
+        } else if (v instanceof Short) {
+            return ((Short) v).intValue();
         } else {
             return v;
         }
     }
 
-    static Pattern sqlPattern = Pattern.compile("(:(.[^\\s,);]*))");
+    protected static Pattern sqlPattern = Pattern.compile("(:(.[^\\s,);]*))");
 
     /**
      * Uses an ApiObject to pass the parameter names to the SQL statement.
@@ -1067,13 +1095,12 @@ public class SsDbUtils {
      *
      * @param conn The connection to use to make the call to SQL
      * @param sql The parameterized SQL
-     * @param keys The names of the keys to capture the new ID from
      * @param args ApiObject with the fields to send to the SQL.
      * @return The first row, the first column as an Integer
      * @throws ApiException Argument exception if the argument doesn't exist in
      * args, SQL exception
      */
-    public static Integer queryObjectForInt(Connection conn, String sql, String[] keys, ApiObject args) throws ApiException {
+    public static Integer queryObjectForInt(Connection conn, String sql, ApiObject args) throws ApiException {
         List<Object> params = new ArrayList<>();
 
         String lclSql = gatherParamsForSql(sql, params, args);
