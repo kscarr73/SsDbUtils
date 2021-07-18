@@ -933,7 +933,7 @@ public class SsDbUtils {
                             replaceVal.append("?");
                         });
 
-                        lclSql = lclSql.replace(":" + found, replaceVal);
+                        lclSql = lclSql.replaceFirst(":" + found, replaceVal.toString());
                         
                         break;
 
@@ -953,12 +953,12 @@ public class SsDbUtils {
                             replaceVal2.append("?");
                         });
 
-                        lclSql = lclSql.replace(":" + found, replaceVal2);
+                        lclSql = lclSql.replaceFirst(":" + found, replaceVal2.toString());
                         break;
 
                     default:
                         params.add(args.get(found));
-                        lclSql = lclSql.replace(":" + found, "?");
+                        lclSql = lclSql.replaceFirst(":" + found, "?");
                 }
             } else {
                 throw new ApiException("Argument: " + found + " Doesn't Exist");
