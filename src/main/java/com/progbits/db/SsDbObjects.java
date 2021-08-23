@@ -47,7 +47,7 @@ public class SsDbObjects {
 				objRet.setLong("total", objCount.getLong("root[0].total"));
 			}
 			
-			return SsDbUtils.querySqlAsApiObject(conn, strSql, selectSql);
+			return objRet;
 		} else {
 			throw new ApiException("SQL Was not created Propertly");
 		}
@@ -91,7 +91,7 @@ public class SsDbObjects {
 			selectObj.remove("whereSql");
 		}
 		
-		if (find.containsKey("orderBy")) {
+		if (find.isSet("orderBy")) {
 			sbSql.append(" ORDER BY ");
 			boolean bFirst = true;
 			
@@ -135,7 +135,7 @@ public class SsDbObjects {
 		return selectObj;
 	}
 	
-	private static final List<String> controlFields = new ArrayList<String>(Arrays.asList(new String[] { "tableName", "fields", "or", "start", "count", "orderBy" }));
+	private static final List<String> controlFields = new ArrayList<String>(Arrays.asList(new String[] { "tableName", "fields", "or", "start", "length", "orderBy" }));
 	
 	public static ApiObject createWhereFromFind(ApiObject find) throws ApiException {
 		StringBuilder sbWhere = new StringBuilder();
