@@ -523,7 +523,7 @@ public class SsDbUtils {
 			closePreparedStatement(stmt);
 		}
 	}
-	
+
 	public static String insertWithStringKey(Connection conn, String sql, Object[] args, String[] keys) throws Exception {
 		PreparedStatement stmt = null;
 		ResultSet rs = null;
@@ -929,7 +929,7 @@ public class SsDbUtils {
 
 			SsDbUtils.queryForAllRowsIntoApiObject(conn, sql, args, retObj);
 		} catch (Exception ex) {
-			throw new ApiException(ex.getMessage());
+			processException(ex);
 		}
 
 		return retObj;
@@ -990,7 +990,7 @@ public class SsDbUtils {
 						lclSql = lclSql.replaceFirst(":" + found, "?");
 				}
 			} else {
-				throw new ApiException("Argument: " + found + " Doesn't Exist");
+				throw new ApiException(400, "Argument: " + found + " Doesn't Exist");
 			}
 		}
 
@@ -1055,8 +1055,10 @@ public class SsDbUtils {
 		try {
 			return update(conn, lclSql, params.toArray());
 		} catch (Exception ex) {
-			throw new ApiException("SQL: " + ex.getMessage());
+			processException(ex);
 		}
+		
+		throw null;
 	}
 
 	/**
@@ -1082,8 +1084,10 @@ public class SsDbUtils {
 		try {
 			return updateWithCount(conn, lclSql, params.toArray());
 		} catch (Exception ex) {
-			throw new ApiException("SQL: " + ex.getMessage());
+			processException(ex);
 		}
+		
+		throw null;
 	}
 
 	/**
@@ -1110,10 +1114,12 @@ public class SsDbUtils {
 		try {
 			return insertWithKey(conn, lclSql, params.toArray(), keys);
 		} catch (Exception ex) {
-			throw new ApiException("SQL: " + ex.getMessage());
+			processException(ex);
 		}
+		
+		return null;
 	}
-	
+
 	/**
 	 * Uses an ApiObject to pass the parameter names to the SQL statement.
 	 *
@@ -1138,8 +1144,10 @@ public class SsDbUtils {
 		try {
 			return insertWithStringKey(conn, lclSql, params.toArray(), keys);
 		} catch (Exception ex) {
-			throw new ApiException("SQL: " + ex.getMessage());
+			processException(ex);
 		}
+		
+		throw null;
 	}
 
 	/**
@@ -1165,7 +1173,29 @@ public class SsDbUtils {
 		try {
 			return queryForInt(conn, lclSql, params.toArray());
 		} catch (Exception ex) {
-			throw new ApiException("SQL: " + ex.getMessage());
+			processException(ex);
+		}
+		
+		throw null;
+	}
+
+	public static void processException(Exception ex) throws ApiException {
+		if (ex instanceof SQLException) {
+			SQLException sqlEx = (SQLException) ex;
+
+			if (sqlEx.getMessage() != null) {
+				if (sqlEx.getMessage().contains("Duplicate")) {
+					throw new ApiException(409, "Duplicate Record");
+				} else {
+					throw new ApiException(400, "SQL: " + ex.getMessage());
+				}
+			} else {
+				throw new ApiException(500, "SQL Exception");
+			}
+		} else if (ex != null && ex.getMessage() != null) {
+			throw new ApiException(400, "SQL: " + ex.getMessage());
+		} else {
+			throw new ApiException(400, "No Information Error", ex);
 		}
 	}
 }
