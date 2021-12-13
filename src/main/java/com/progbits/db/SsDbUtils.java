@@ -1025,6 +1025,14 @@ public class SsDbUtils {
 			return OffsetDateTime.ofInstant(instant, ZoneId.systemDefault());
 		} else if (v instanceof Short) {
 			return ((Short) v).intValue();
+                } else if (v instanceof BigDecimal) {
+                    BigDecimal b = (BigDecimal) v;
+                    
+                    if (b.scale() == 0) {
+                        return b.longValue();
+                    } else {
+                        return b.doubleValue();
+                    }
 		} else {
 			return v;
 		}
