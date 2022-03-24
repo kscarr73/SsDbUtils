@@ -896,7 +896,9 @@ public class SsDbUtils {
 				for (int xrow = 1; xrow <= iColumnCount; xrow++) {
 					String colName = rs.getSecond().getMetaData().getColumnLabel(xrow);
 
-					row.put(colName, convertObject(rs.getSecond().getObject(xrow)));
+                                        Object objValue = rs.getSecond().getObject(xrow);
+                                        
+					row.put(colName, convertObject(objValue));
 				}
 
 				root.add(row);
