@@ -44,7 +44,7 @@ public class SsDbObjects {
             objOperator.put(operator, value);
 
             objField.setObject(fieldName, objOperator);
-            
+
             find.getList(logicalName).add(objField);
         } else {
             objField.put(fieldName, value);
@@ -168,14 +168,14 @@ public class SsDbObjects {
             if ("Microsoft SQL Server".equals(dbType)) {
                 if (find.containsKey("start")) {
                     sbSql.append(" OFFSET ")
-                        .append(find.getInteger("start"))
-                        .append(" ROWS ");
+                            .append(find.getInteger("start"))
+                            .append(" ROWS ");
                 }
 
                 if (find.containsKey("length")) {
                     sbSql.append(" FETCH NEXT ")
-                        .append(find.getInteger("length"))
-                        .append(" ROWS ONLY ");
+                            .append(find.getInteger("length"))
+                            .append(" ROWS ONLY ");
                 }
             } else if (dbType.equals("MySQL") || dbType.equals("PostgreSQL")) {
                 if (find.containsKey("length")) {
@@ -311,7 +311,7 @@ public class SsDbObjects {
      * @throws ApiException If the ROW that was updated or inserted is not
      * returned
      */
-    public static ApiObject upsertWithInteger(Connection conn, String tableName, String idField, ApiObject obj) throws ApiException {
+    public static ApiObject upsertWithIntegerKey(Connection conn, String tableName, String idField, ApiObject obj) throws ApiException {
         Integer idValue = null;
 
         if (obj.isSet(idField)) {
@@ -347,7 +347,7 @@ public class SsDbObjects {
      * @throws ApiException If the ROW that was updated or inserted is not
      * returned
      */
-    public static ApiObject upsertWithString(Connection conn, String tableName, String idField, ApiObject obj) throws ApiException {
+    public static ApiObject upsertWithStringKey(Connection conn, String tableName, String idField, ApiObject obj) throws ApiException {
         String idValue = null;
 
         if (obj.isSet(idField)) {
@@ -367,6 +367,61 @@ public class SsDbObjects {
             return retObj.getList("root").get(0);
         } else {
             throw new ApiException("ROW Was Not returned for ID: " + idValue);
+        }
+    }
+
+    /**
+     * Upsert an Object to the database, given an id field.
+     *
+     * This does not return a generated Key Field.
+     *
+     * @param conn Connection to use for processing the Object
+     * @param tableName The table for the information being inserted
+     * @param idField The field used as an ID for the table
+     * @param obj The object to insert or update
+     *
+     * @return The Object that was created in the Database
+     *
+     * @throws ApiException If the ROW that was updated or inserted is not
+     * returned
+     */
+    public static ApiObject upsertWithId(Connection conn, String tableName, String idField, ApiObject obj) throws ApiException {
+        try {
+            boolean performInsert = true;
+
+            if (obj.containsKey(idField)) {
+                Integer iCnt = SsDbUtils.queryForInt(conn,
+                        String.format("SELECT COUNT(*) AS retCount FROM %s WHERE %s=?",
+                                tableName, idField),
+                        new Object[]{obj.get(idField)});
+
+                if (iCnt > 0) {
+
+                } else {
+
+                }
+            }
+
+            if (performInsert) {
+                Tuple<String, Object[]> insertObj = createObjectInsertSqlDirect(tableName, idField, obj);
+                SsDbUtils.update(conn, insertObj.getFirst(), insertObj.getSecond());
+            } else {
+                Tuple<String, Object[]> updateObj = createObjectUpdateSqlDirect(tableName, idField, obj);
+                SsDbUtils.update(conn, updateObj.getFirst(), updateObj.getSecond());
+            }
+
+            ApiObject objRet = SsDbUtils.querySqlAsApiObject(conn,
+                    String.format("SELECT * FROM %s WHERE %s=?",
+                            tableName, idField),
+                    new Object[]{obj.get(idField)});
+
+            if (objRet.isSet("root")) {
+                return objRet.getList("root").get(0);
+            } else {
+                throw new ApiException(500, "The Record was not created properly");
+            }
+        } catch (Exception ex) {
+            throw new ApiException(400, ex.getMessage());
         }
     }
 
@@ -400,6 +455,93 @@ public class SsDbObjects {
         sb.append(idField);
 
         return sb.toString();
+    }
+
+    private static Tuple<String, Object[]> createObjectUpdateSqlDirect(String tableName, String idField, ApiObject obj) throws ApiException {
+        if (obj.isEmpty()) {
+            throw new ApiException("Object MUST not be empty");
+        }
+
+        if (!obj.containsKey(idField)) {
+            throw new ApiException("Field: " + idField + " MUST be set");
+        }
+
+        List<Object> objFields = new ArrayList<>();
+
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("UPDATE ");
+        sb.append(tableName);
+        sb.append(" SET ");
+
+        boolean bFirst = true;
+
+        for (String fldName : obj.keySet()) {
+            if (!idField.equals(fldName)) {
+                if (bFirst) {
+                    bFirst = false;
+                } else {
+                    sb.append(",");
+                }
+
+                sb.append(fldName).append("=?");
+
+                objFields.add(obj.get(fldName));
+            }
+        }
+
+        sb.append(" WHERE ");
+        sb.append(idField);
+        sb.append("=?");
+
+        objFields.add(obj.get(idField));
+
+        Tuple<String, Object[]> retObj = new Tuple<>();
+
+        retObj.setFirst(sb.toString());
+        retObj.setSecond(objFields.toArray());
+
+        return retObj;
+    }
+
+    private static Tuple<String, Object[]> createObjectInsertSqlDirect(String tableName, String idField, ApiObject obj) throws ApiException {
+        if (obj.isEmpty()) {
+            throw new ApiException("Object MUST not be empty");
+        }
+
+        List<Object> objFields = new ArrayList<>();
+
+        StringBuilder sb = new StringBuilder();
+        StringBuilder sbFields = new StringBuilder();
+
+        sb.append("INSERT INTO ");
+        sb.append(tableName);
+        sb.append(" (");
+
+        boolean bFirst = true;
+
+        for (String fldName : obj.keySet()) {
+            if (bFirst) {
+                bFirst = false;
+            } else {
+                sb.append(",");
+                sbFields.append(",");
+            }
+
+            sb.append(fldName);
+            sbFields.append("?");
+            objFields.add(obj.get(fldName));
+        }
+
+        sb.append(") VALUES (");
+        sb.append(sbFields);
+        sb.append(")");
+
+        Tuple<String, Object[]> retObj = new Tuple<>();
+        retObj.setFirst(sb.toString());
+        retObj.setSecond(objFields.toArray());
+
+        return retObj;
     }
 
     private static String createObjectInsertSql(String tableName, String idField, ApiObject obj) throws ApiException {
