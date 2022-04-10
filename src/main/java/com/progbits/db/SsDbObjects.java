@@ -111,6 +111,8 @@ public class SsDbObjects {
 
                 sbSql.append(field);
             }
+
+            sbSql.append(" FROM ").append(tableName);
         }
 
         sbCount.append("SELECT COUNT(*) AS total FROM ").append(tableName);
