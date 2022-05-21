@@ -398,9 +398,7 @@ public class SsDbObjects {
                         new Object[]{obj.get(idField)});
 
                 if (iCnt > 0) {
-
-                } else {
-
+                    performInsert = false;
                 }
             }
 
