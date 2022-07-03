@@ -59,10 +59,13 @@ public class SsDbObjects {
         if (selectSql.isSet("selectSql")) {
             String strSql = selectSql.getString("selectSql");
             String strCount = selectSql.getString("countSql");
+            String dbType = selectSql.getString("dbType");
+
             List<Object> params = (List<Object>) selectSql.get("params");
 
             selectSql.remove("selectSql");
             selectSql.remove("countSql");
+            selectSql.remove("dbType");
 
             long lStart = System.currentTimeMillis();
 
@@ -77,7 +80,11 @@ public class SsDbObjects {
             objRet.setLong("sqlTime", System.currentTimeMillis() - lStart);
             objRet.setLong("sqlCount", lCountTime);
             if (objCount.containsKey("root")) {
-                objRet.setLong("total", objCount.getLong("root[0].total"));
+                if ("H2".equals(dbType)) {
+                    objRet.setLong("total", objCount.getLong("root[0].TOTAL"));
+                } else {
+                    objRet.setLong("total", objCount.getLong("root[0].total"));
+                }
             }
 
             return objRet;
@@ -156,9 +163,19 @@ public class SsDbObjects {
             }
         }
 
-        if (find.isSet("orderBy")) {
-            String dbType = null;
+        String dbType = null;
 
+        try {
+            if (conn != null) {
+                dbType = conn.getMetaData().getDatabaseProductName();
+            }
+        } catch (SQLException sqx) {
+            dbType = "MySQL";
+        }
+
+        selectObj.setString("dbType", dbType);
+
+        if (find.isSet("orderBy")) {
             try {
                 if (conn != null) {
                     dbType = conn.getMetaData().getDatabaseProductName();
@@ -179,7 +196,7 @@ public class SsDbObjects {
                             .append(find.getInteger("length"))
                             .append(" ROWS ONLY ");
                 }
-            } else if (dbType.equals("MySQL") || dbType.equals("PostgreSQL")) {
+            } else if (dbType.equals("MySQL") || dbType.equals("PostgreSQL") || dbType.equals("H2")) {
                 if (find.containsKey("length")) {
                     sbSql.append(" LIMIT ").append(find.getInteger("length"));
                 }
