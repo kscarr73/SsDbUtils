@@ -196,7 +196,7 @@ public class SsDbObjects {
                             .append(find.getInteger("length"))
                             .append(" ROWS ONLY ");
                 }
-            } else if (dbType.equals("MySQL") || dbType.equals("PostgreSQL") || dbType.equals("H2")) {
+            } else if ("MariaDB".equals(dbType) || "MySQL".equals(dbType) || "PostgreSQL".equals(dbType) || "H2".equals(dbType)) {
                 if (find.containsKey("length")) {
                     sbSql.append(" LIMIT ").append(find.getInteger("length"));
                 }
@@ -331,25 +331,10 @@ public class SsDbObjects {
      * returned
      */
     public static ApiObject upsertWithIntegerKey(Connection conn, String tableName, String idField, ApiObject obj) throws ApiException {
-        Integer idValue = null;
-
         if (obj.isSet(idField)) {
-            idValue = obj.getInteger(idField);
-
-            updateObject(conn, createObjectUpdateSql(tableName, idField, obj), obj);
-        } else {  // Perform Insert
-            idValue = insertObjectWithKey(conn, createObjectInsertSql(tableName, idField, obj), new String[]{idField}, obj);
-        }
-
-        ApiObject searchObj = new ApiObject();
-        searchObj.setInteger(idField, idValue);
-
-        ApiObject retObj = querySqlAsApiObject(conn, "SELECT * FROM " + tableName + " WHERE " + idField + "=:" + idField, searchObj);
-
-        if (retObj.isSet("root")) {
-            return retObj.getList("root").get(0);
+            return updateWithIntegerKey(conn, tableName, idField, obj);
         } else {
-            throw new ApiException("ROW Was Not returned for ID: " + idValue);
+            return insertWithIntegerKey(conn, tableName, idField, obj);
         }
     }
 
@@ -456,14 +441,16 @@ public class SsDbObjects {
         boolean bFirst = true;
 
         for (String fldName : obj.keySet()) {
-            if (bFirst) {
-                bFirst = false;
-            } else {
-                sb.append(",");
-            }
+            if (obj.getType(fldName) != ApiObject.TYPE_ARRAYLIST && obj.getType(fldName) != ApiObject.TYPE_OBJECT) {
+                if (bFirst) {
+                    bFirst = false;
+                } else {
+                    sb.append(",");
+                }
 
-            sb.append(fldName).append("=");
-            sb.append(":").append(fldName);
+                sb.append(fldName).append("=");
+                sb.append(":").append(fldName);
+            }
         }
 
         sb.append(" WHERE ");
@@ -538,16 +525,18 @@ public class SsDbObjects {
         boolean bFirst = true;
 
         for (String fldName : obj.keySet()) {
-            if (bFirst) {
-                bFirst = false;
-            } else {
-                sb.append(",");
-                sbFields.append(",");
-            }
+            if (obj.getType(fldName) != ApiObject.TYPE_ARRAYLIST && obj.getType(fldName) != ApiObject.TYPE_OBJECT) {
+                if (bFirst) {
+                    bFirst = false;
+                } else {
+                    sb.append(",");
+                    sbFields.append(",");
+                }
 
-            sb.append(fldName);
-            sbFields.append("?");
-            objFields.add(obj.get(fldName));
+                sb.append(fldName);
+                sbFields.append("?");
+                objFields.add(obj.get(fldName));
+            }
         }
 
         sb.append(") VALUES (");
@@ -576,15 +565,17 @@ public class SsDbObjects {
         boolean bFirst = true;
 
         for (String fldName : obj.keySet()) {
-            if (bFirst) {
-                bFirst = false;
-            } else {
-                sb.append(",");
-                sbFields.append(",");
-            }
+            if (obj.getType(fldName) != ApiObject.TYPE_ARRAYLIST && obj.getType(fldName) != ApiObject.TYPE_OBJECT) {
+                if (bFirst) {
+                    bFirst = false;
+                } else {
+                    sb.append(",");
+                    sbFields.append(",");
+                }
 
-            sb.append(fldName);
-            sbFields.append(":").append(fldName);
+                sb.append(fldName);
+                sbFields.append(":").append(fldName);
+            }
         }
 
         sb.append(") VALUES (");
@@ -592,5 +583,43 @@ public class SsDbObjects {
         sb.append(")");
 
         return sb.toString();
+    }
+
+    public static ApiObject insertWithIntegerKey(Connection conn, String tableName, String idField, ApiObject obj) throws ApiException {
+        Integer idValue = insertObjectWithKey(conn, createObjectInsertSql(tableName, idField, obj), new String[]{idField}, obj);
+
+        ApiObject searchObj = new ApiObject();
+        searchObj.setInteger(idField, idValue);
+
+        ApiObject retObj = querySqlAsApiObject(conn, "SELECT * FROM " + tableName + " WHERE " + idField + "=:" + idField, searchObj);
+
+        if (retObj.isSet("root")) {
+            return retObj.getList("root").get(0);
+        } else {
+            throw new ApiException("ROW Was Not returned for ID: " + idValue);
+        }
+    }
+
+    public static ApiObject updateWithIntegerKey(Connection conn, String tableName, String idField, ApiObject obj) throws ApiException {
+        Integer idValue = null;
+
+        if (obj.isSet(idField)) {
+            idValue = obj.getInteger(idField);
+
+            updateObject(conn, createObjectUpdateSql(tableName, idField, obj), obj);
+        } else {
+            throw new ApiException(400, idField + " Is Required");
+        }
+
+        ApiObject searchObj = new ApiObject();
+        searchObj.setInteger(idField, idValue);
+
+        ApiObject retObj = querySqlAsApiObject(conn, "SELECT * FROM " + tableName + " WHERE " + idField + "=:" + idField, searchObj);
+
+        if (retObj.isSet("root")) {
+            return retObj.getList("root").get(0);
+        } else {
+            throw new ApiException("ROW Was Not returned for ID: " + idValue);
+        }
     }
 }
