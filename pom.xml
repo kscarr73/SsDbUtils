@@ -17,7 +17,7 @@
     <repositories>
         <repository>
             <id>ProgbitsRepo</id>
-            <url>https://archiva.progbits.com/repository/internal/</url>
+	    <url>https://archiva.progbits.com/coffer/repository/internal/</url>
         </repository>
     </repositories>
 
