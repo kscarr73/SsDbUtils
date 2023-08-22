@@ -133,35 +133,7 @@ public class SsDbObjects {
             selectObj.remove("whereSql");
         }
 
-        if (find.isSet("orderBy")) {
-            sbSql.append(" ORDER BY ");
-            boolean bFirst = true;
-
-            for (String fieldName : find.getStringArray("orderBy")) {
-                if (bFirst) {
-                    bFirst = false;
-                } else {
-                    sbSql.append(",");
-                }
-
-                boolean ascending = true;
-
-                if (fieldName.startsWith("+")) {
-                    fieldName = fieldName.substring(1);
-                } else if (fieldName.startsWith("-")) {
-                    fieldName = fieldName.substring(1);
-                    ascending = false;
-                }
-
-                sbSql.append(fieldName);
-
-                if (ascending) {
-                    sbSql.append(" asc");
-                } else {
-                    sbSql.append(" desc");
-                }
-            }
-        }
+        applyOrderBy(conn, find, sbSql);
 
         String dbType = null;
 
@@ -175,37 +147,7 @@ public class SsDbObjects {
 
         selectObj.setString("dbType", dbType);
 
-        if (find.isSet("orderBy")) {
-            try {
-                if (conn != null) {
-                    dbType = conn.getMetaData().getDatabaseProductName();
-                }
-            } catch (SQLException sqx) {
-                dbType = "MySQL";
-            }
-
-            if ("Microsoft SQL Server".equals(dbType)) {
-                if (find.containsKey("start")) {
-                    sbSql.append(" OFFSET ")
-                            .append(find.getInteger("start"))
-                            .append(" ROWS ");
-                }
-
-                if (find.containsKey("length")) {
-                    sbSql.append(" FETCH NEXT ")
-                            .append(find.getInteger("length"))
-                            .append(" ROWS ONLY ");
-                }
-            } else if ("MariaDB".equals(dbType) || "MySQL".equals(dbType) || "PostgreSQL".equals(dbType) || "H2".equals(dbType)) {
-                if (find.containsKey("length")) {
-                    sbSql.append(" LIMIT ").append(find.getInteger("length"));
-                }
-
-                if (find.containsKey("start")) {
-                    sbSql.append(" OFFSET ").append(find.getInteger("start"));
-                }
-            }
-        }
+        applyLimit(conn, find, sbSql);
 
         selectObj.setString("selectSql", sbSql.toString());
         selectObj.setString("countSql", sbCount.toString());
@@ -620,6 +562,73 @@ public class SsDbObjects {
             return retObj.getList("root").get(0);
         } else {
             throw new ApiException("ROW Was Not returned for ID: " + idValue);
+        }
+    }
+
+    public static void applyLimit(Connection conn, ApiObject find, StringBuilder sbSql) {
+        String dbType = null;
+        if (find.isSet("orderBy")) {
+            try {
+                if (conn != null) {
+                    dbType = conn.getMetaData().getDatabaseProductName();
+                }
+            } catch (SQLException sqx) {
+                dbType = "MySQL";
+            }
+
+            if ("Microsoft SQL Server".equals(dbType)) {
+                if (find.containsKey("start")) {
+                    sbSql.append(" OFFSET ")
+                            .append(find.getInteger("start"))
+                            .append(" ROWS ");
+                }
+
+                if (find.containsKey("length")) {
+                    sbSql.append(" FETCH NEXT ")
+                            .append(find.getInteger("length"))
+                            .append(" ROWS ONLY ");
+                }
+            } else if ("MariaDB".equals(dbType) || "MySQL".equals(dbType) || "PostgreSQL".equals(dbType) || "H2".equals(dbType)) {
+                if (find.containsKey("length")) {
+                    sbSql.append(" LIMIT ").append(find.getInteger("length"));
+                }
+
+                if (find.containsKey("start")) {
+                    sbSql.append(" OFFSET ").append(find.getInteger("start"));
+                }
+            }
+        }
+    }
+
+    public static void applyOrderBy(Connection conn, ApiObject find, StringBuilder sbSql) {
+        if (find.isSet("orderBy")) {
+            sbSql.append(" ORDER BY ");
+            boolean bFirst = true;
+
+            for (String fieldName : find.getStringArray("orderBy")) {
+                if (bFirst) {
+                    bFirst = false;
+                } else {
+                    sbSql.append(",");
+                }
+
+                boolean ascending = true;
+
+                if (fieldName.startsWith("+")) {
+                    fieldName = fieldName.substring(1);
+                } else if (fieldName.startsWith("-")) {
+                    fieldName = fieldName.substring(1);
+                    ascending = false;
+                }
+
+                sbSql.append(fieldName);
+
+                if (ascending) {
+                    sbSql.append(" asc");
+                } else {
+                    sbSql.append(" desc");
+                }
+            }
         }
     }
 }
