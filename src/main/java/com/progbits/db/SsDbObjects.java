@@ -227,31 +227,66 @@ public class SsDbObjects {
 
     private static void applyWhereField(ApiObject find, String key, StringBuilder sbWhere, List<Object> params) {
         if (find.getType(key) == ApiObject.TYPE_OBJECT) {
-            if (find.getObject(key).containsKey("$eq")) {
-                sbWhere.append(key).append("=").append(" ?").append(" ");
-                params.add(find.getObject(key).get("$eq"));
-            } else if (find.getObject(key).containsKey("$gt")) {
-                sbWhere.append(key).append(">").append(" ?").append(" ");
-                params.add(find.getObject(key).get("$gt"));
-            } else if (find.getObject(key).containsKey("$lt")) {
-                sbWhere.append(key).append("<").append(" ?").append(" ");
-                params.add(find.getObject(key).get("$lt"));
-            } else if (find.getObject(key).containsKey("$gte")) {
-                sbWhere.append(key).append(">=").append(":").append(key).append(" ");
-                params.add(find.getObject(key).get("$gte"));
-            } else if (find.getObject(key).containsKey("$lte")) {
-                sbWhere.append(key).append("<=").append(":").append(key).append(" ");
-                params.add(find.getObject(key).get("$lte"));
-            } else if (find.getObject(key).containsKey("$in")) {
-                // TODO:  Need to handle StringArray or IntegerArray
-                sbWhere.append(key).append(" IN (").append(" ?").append(" ) ");
-                params.add(find.getObject(key).get("$in"));
-            } else if (find.getObject(key).containsKey("$like")) {
-                sbWhere.append(key).append(" LIKE ").append(" ?").append(" ");
-                params.add(find.getObject(key).get("$like"));
-            } else if (find.getObject(key).containsKey("$reg")) {
-                sbWhere.append(key).append(" REGEXP ").append(" ?").append(" ");
-                params.add(find.getObject(key).get("$reg"));
+            int iCnt = 0;
+
+            String lclKey = key;
+            String lclParam = " ?";
+            
+            ApiObject keyFindObj = find.getObject(key);
+            
+            if (keyFindObj.containsKey("$case") && !keyFindObj.isSet("$case")) {
+                lclKey = "lower(" + key + ")";
+                lclParam = " lower(?)";
+            }
+            
+            for (var entry : keyFindObj.keySet()) {
+                if (iCnt > 0 && !"$case".equals(entry)) {
+                    sbWhere.append(" AND ");
+                }
+                
+                switch (entry) {
+                    case "$eq": 
+                        sbWhere.append(lclKey).append(" =").append(lclParam).append(" ");
+                        params.add(keyFindObj.get("$eq"));
+                        break;
+                    
+                    case "$gt": 
+                        sbWhere.append(lclKey).append(" >").append(lclParam).append(" ");
+                        params.add(keyFindObj.get("$gt"));
+                        break;
+                    
+                    case "$lt": 
+                        sbWhere.append(lclKey).append(" <").append(lclParam).append(" ");
+                        params.add(keyFindObj.get("$lt"));
+                        break;
+                    
+                    case "$gte": 
+                        sbWhere.append(lclKey).append(" >=").append(lclParam).append(" ");
+                        params.add(keyFindObj.get("$gte"));
+                        break;
+                    
+                    case "$lte": 
+                        sbWhere.append(lclKey).append(" <=").append(lclParam).append(" ");
+                        params.add(keyFindObj.get("$lte"));
+                        break;
+                    
+                    case "$in": 
+                        // TODO:  Need to handle StringArray or IntegerArray
+                        sbWhere.append(lclKey).append(" IN (").append(lclParam).append(" ) ");
+                        params.add(keyFindObj.get("$in"));
+                        break;
+                    
+                    case "$like": 
+                        sbWhere.append(lclKey).append(" LIKE ").append(lclParam).append(" ");
+                        params.add(keyFindObj.get("$like"));
+                        break;
+                        
+                    case "$reg": 
+                        sbWhere.append(key).append(" REGEXP ").append(" ?").append(" ");
+                        params.add(keyFindObj.get("$reg"));
+                        break;
+                }
+                iCnt++;
             }
         } else {
             sbWhere.append(key).append("=").append(" ? ");
