@@ -159,6 +159,7 @@ public class SsDbObjects {
     private static final List<String> controlFieldsLogical = new ArrayList<String>(Arrays.asList(new String[]{"$or", "$and"}));
 
     public static ApiObject createWhereFromFind(ApiObject find) throws ApiException {
+        String dbType = null;
         StringBuilder sbWhere = new StringBuilder();
         ApiObject retObj = new ApiObject();
         List<Object> params = new ArrayList<>();
@@ -231,57 +232,55 @@ public class SsDbObjects {
 
             String lclKey = key;
             String lclParam = " ?";
-            
+
             ApiObject keyFindObj = find.getObject(key);
-            
+
             if (keyFindObj.containsKey("$case") && !keyFindObj.isSet("$case")) {
                 lclKey = "lower(" + key + ")";
                 lclParam = " lower(?)";
             }
-            
+
             for (var entry : keyFindObj.keySet()) {
                 if (iCnt > 0 && !"$case".equals(entry)) {
                     sbWhere.append(" AND ");
                 }
-                
+
                 switch (entry) {
-                    case "$eq": 
+                    case "$eq":
                         sbWhere.append(lclKey).append(" =").append(lclParam).append(" ");
                         params.add(keyFindObj.get("$eq"));
                         break;
-                    
-                    case "$gt": 
+
+                    case "$gt":
                         sbWhere.append(lclKey).append(" >").append(lclParam).append(" ");
                         params.add(keyFindObj.get("$gt"));
                         break;
-                    
-                    case "$lt": 
+
+                    case "$lt":
                         sbWhere.append(lclKey).append(" <").append(lclParam).append(" ");
                         params.add(keyFindObj.get("$lt"));
                         break;
-                    
-                    case "$gte": 
+
+                    case "$gte":
                         sbWhere.append(lclKey).append(" >=").append(lclParam).append(" ");
                         params.add(keyFindObj.get("$gte"));
                         break;
-                    
-                    case "$lte": 
+
+                    case "$lte":
                         sbWhere.append(lclKey).append(" <=").append(lclParam).append(" ");
                         params.add(keyFindObj.get("$lte"));
                         break;
-                    
-                    case "$in": 
-                        // TODO:  Need to handle StringArray or IntegerArray
-                        sbWhere.append(lclKey).append(" IN (").append(lclParam).append(" ) ");
-                        params.add(keyFindObj.get("$in"));
+
+                    case "$in":
+                        processSqlInStatement(keyFindObj, sbWhere, params, lclKey, lclParam);
                         break;
-                    
-                    case "$like": 
+
+                    case "$like":
                         sbWhere.append(lclKey).append(" LIKE ").append(lclParam).append(" ");
                         params.add(keyFindObj.get("$like"));
                         break;
-                        
-                    case "$reg": 
+
+                    case "$reg":
                         sbWhere.append(key).append(" REGEXP ").append(" ?").append(" ");
                         params.add(keyFindObj.get("$reg"));
                         break;
@@ -292,6 +291,59 @@ public class SsDbObjects {
             sbWhere.append(key).append("=").append(" ? ");
             params.add(find.get(key));
         }
+    }
+
+    /*
+     * We need to break out the Array elements to make it easier for the IN command to process
+     */
+    private static void processSqlInStatement(ApiObject keyFindObj, StringBuilder sbWhere, List<Object> params, String lclKey, String lclParam) {
+        sbWhere.append(lclKey).append(" IN (");
+
+        int iInCnt = 0;
+
+        switch (keyFindObj.getType("$in")) {
+            case ApiObject.TYPE_STRINGARRAY:
+                for (var inEntry : keyFindObj.getStringArray("$in")) {
+                    if (iInCnt > 0) {
+                        sbWhere.append(",");
+                    }
+                    
+                    sbWhere.append(lclParam);
+                    params.add(inEntry);
+                    
+                    iInCnt++;
+                }   
+                break;
+            case ApiObject.TYPE_INTEGERARRAY:
+                for (var inEntry : keyFindObj.getIntegerArray("$in")) {
+                    if (iInCnt > 0) {
+                        sbWhere.append(",");
+                    }
+                    
+                    sbWhere.append(lclParam);
+                    params.add(inEntry);
+                    
+                    iInCnt++;
+                }   
+                break;
+            case ApiObject.TYPE_DOUBLEARRAY:
+                for (var inEntry : keyFindObj.getDoubleArray("$in")) {
+                    if (iInCnt > 0) {
+                        sbWhere.append(",");
+                    }
+                    
+                    sbWhere.append(lclParam);
+                    params.add(inEntry);
+                    
+                    iInCnt++;
+                }
+                break;
+            default:
+                break;
+        }
+
+        sbWhere.append(" ) ");
+
     }
 
     /**
